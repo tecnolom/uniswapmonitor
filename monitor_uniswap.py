@@ -130,8 +130,8 @@ if driver:
     fees_value, range_status = get_fees_and_range_status(driver)
     
     if fees_value:
-        message = f"🦄 <b>Ganhos Uniswap...</b>\n\n"
-        message += f"💵 Total disponível para soleta: <b>${fees_value:.2f}</b>\n"
+        message = f"🦄 <b>Slerta de Ganhos...</b>\n\n"
+        message += f"💵 Total disponível para coleta: <b>${fees_value:.2f}</b>\n"
         
         if "🟢" in range_status:
             message += f"🟢 Pool Status: Dentro do Range"
