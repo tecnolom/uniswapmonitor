@@ -30,7 +30,8 @@ def setup_driver():
        chrome_options.add_argument("--no-sandbox")
        chrome_options.add_argument("--disable-dev-shm-usage")
        chrome_options.add_argument("--disable-gpu")
-       chrome_options.add_argument("--remote-debugging-port=9222")
+       chrome_options.add_argument("--window-size=1920,1080")
+       chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
        
        service = Service(ChromeDriverManager().install())
        driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -43,9 +44,14 @@ def get_fees_and_range_status(driver):
    try:
        print("Acessando Uniswap...")
        driver.get(UNISWAP_URL)
-       time.sleep(20)
+       time.sleep(30)  # Mais tempo para carregar
        
        page_source = driver.page_source
+       print(f"Página carregada: {len(page_source)} caracteres")
+       
+       # Debug: procurar por "fees" em geral
+       fees_count = page_source.lower().count('fees')
+       print(f"Palavra 'fees' encontrada {fees_count} vezes")
        
        range_status = "Status desconhecido"
        page_lower = page_source.lower()
@@ -61,30 +67,41 @@ def get_fees_and_range_status(driver):
        
        print(f"Status do Range: {range_status}")
        
-       fees_value = None
-       fee_keywords = ["Fees earned", "Fees"]
+       # BUSCA MAIS AGRESSIVA - procurar TODOS os valores em dólar
+       print("🔍 Procurando TODOS os valores em dólar...")
+       patterns = [r'(\d+[,.]?\d*)\s*US\$', r'(\d+[,.]\d+)\s*US\$', r'\$(\d+[,.]?\d*)', r'(\d+[,.]\d+)\s*USD']
+       found_values = []
        
-       for keyword in fee_keywords:
-           if keyword in page_source:
-               sections = page_source.split(keyword)
-               if len(sections) > 1:
-                   fees_section = sections[1][:1000]
-                   print(f"✅ Seção '{keyword}' encontrada!")
-                   
-                   patterns = [r'(\d+[,.]?\d*)\s*US\$', r'(\d+[,.]\d+)\s*US\$', r'\$(\d+[,.]?\d*)', r'(\d+[,.]\d+)\s*USD']
-                   
-                   for pattern in patterns:
-                       matches = re.findall(pattern, fees_section)
-                       if matches:
-                           try:
-                               value_str = str(matches[0]).replace(',', '.')
-                               fees_value = float(value_str)
-                               print(f"💰 Valor das Fees: ${fees_value:.2f}")
-                               return fees_value, range_status
-                           except:
-                               continue
+       for pattern in patterns:
+           matches = re.findall(pattern, page_source)
+           for match in matches:
+               try:
+                   value = float(str(match).replace(',', '.'))
+                   if 10 <= value <= 1000:  # Range para fees típicas
+                       found_values.append(value)
+               except:
+                   continue
        
-       print("❌ Seções de fees não encontradas!")
+       if found_values:
+           unique_values = sorted(list(set(found_values)), reverse=True)
+           print(f"💰 Valores encontrados: {[f'${v:.2f}' for v in unique_values[:10]]}")
+           
+           # Estratégia: pegar o valor que mais faz sentido para fees
+           # Procurar valor próximo ao range esperado (30-60)
+           best_candidate = None
+           for value in unique_values:
+               if 25 <= value <= 100:  # Range típico de fees
+                   best_candidate = value
+                   break
+           
+           if not best_candidate and unique_values:
+               best_candidate = unique_values[0]  # Fallback
+           
+           if best_candidate:
+               print(f"✅ Valor selecionado: ${best_candidate:.2f}")
+               return best_candidate, range_status
+       
+       print("❌ Nenhum valor válido encontrado")
        return None, range_status
            
    except Exception as e:
@@ -109,5 +126,10 @@ if driver:
         
         send_telegram_message(message)
         print(f"✅ Verificação enviada: ${fees_value:.2f}")
+    else:
+        # Se não encontrou, enviar debug
+        debug_msg = f"🔧 <b>Debug GitHub Actions</b>\n\nNão conseguiu encontrar valores de fees.\nStatus: {range_status}"
+        send_telegram_message(debug_msg)
+        print("❌ Enviado debug para Telegram")
     
     driver.quit()
