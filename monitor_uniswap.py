@@ -11,7 +11,7 @@ import os
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 CHAT_IDS = [os.environ.get('CHAT_ID1'), os.environ.get('CHAT_ID2')]
-UNISWAP_URL = "https://app.uniswap.org/positions/v3/ethereum/1086592"
+UNISWAP_URL = "https://app.uniswap.org/positions/v3/ethereum/1088125"
 
 def send_telegram_message(message):
    try:
